@@ -88,7 +88,7 @@ class Cache(object):
         return key
 
     def _gen_hash(self, key):
-        h = hashlib.sha1(key).hexdigest()
+        h = hashlib.sha1(key.encode('utf-8')).hexdigest()
         return h
 
     def _gen_paths(self, hash):
@@ -117,7 +117,7 @@ class Cache(object):
         with open(hpath, "wb") as fh:
             for chunk in res.iter_content(1024):
                 fh.write(chunk)
-        with open(dhpath, "wb") as fh:
+        with open(dhpath, "w") as fh:
             json.dump({
                 "status_code": res.status_code,
                 "reason": res.reason,
@@ -147,7 +147,7 @@ class Cache(object):
             data = json.load(open(dhpath))
             data["content"] = hpath
             res = Struct()
-            for k, v in data.iteritems():
+            for k, v in data.items():
                 setattr(res, k, v)
             return res
 
@@ -231,26 +231,28 @@ class AbstractRepository(object):
 
     def get_versions(self, coordinate):
         query = Artifact(coordinate)
-        if self.exists(query.path):
-            if query.version and query.version.version:
+        if query.version and query.version.version:
+            if self.exists(query.path):
                 return [Artifact(coordinate)]
 
-            version_range = query.version
-            if version_range is None:
-                version_range = VersionRange("[,)")
+            return []
 
-            # base coordinate for all return values is everything up to the
-            # version of the query
-            base_coordinate = "%s:%s" % (query.group_id, query.artifact_id)
-            if query.classifier:
-                base_coordinate += "%s:%s" % (query.type, query.classifier)
-            elif query.type != "jar":
-                base_coordinate += ":%s" % query.type
+        version_range = query.version
+        if version_range is None:
+            version_range = VersionRange("[,)")
 
-            return sorted([
-                Artifact(':'.join([base_coordinate, version]))
-                for version in self.listdir(query.path)
-                if version in version_range], reverse=True)
+        # base coordinate for all return values is everything up to the
+        # version of the query
+        base_coordinate = "%s:%s" % (query.group_id, query.artifact_id)
+        if query.classifier:
+            base_coordinate += "%s:%s" % (query.type, query.classifier)
+        elif query.type != "jar":
+            base_coordinate += ":%s" % query.type
+
+        return sorted([
+            Artifact(':'.join([base_coordinate, version]))
+            for version in self.listdir(query.path)
+            if version in version_range], reverse=True)
 
     def exists(self, path):
         """Return ``True`` if *path* exists in the repository, ``False``
@@ -266,7 +268,7 @@ class AbstractRepository(object):
         try:
             return self._listdir(path)
         except (OSError, requests.exceptions.HTTPError):
-            raise MissingPathError(path)
+            return []
 
     def open(self, path):
         try:
