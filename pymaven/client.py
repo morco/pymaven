@@ -238,7 +238,7 @@ class AbstractRepository(object):
             return []
 
         version_range = query.version
-        if version_range is None:
+        if not version_range:
             version_range = VersionRange("[,)")
 
         # base coordinate for all return values is everything up to the
